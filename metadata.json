@@ -1,0 +1,9 @@
+{
+  "name": "Road Pone",
+  "description": "A terminal-style AI interaction interface with TanStack Query and Zustand state management.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera",
+    "geolocation"
+  ]
+}
