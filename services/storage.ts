@@ -1,57 +1,35 @@
 
+import Dexie, { type Table } from 'dexie';
 import { MedicalEncounter } from '../types';
-
-const DB_NAME = 'RanvierVault';
-const STORE_NAME = 'encounters';
-const DB_VERSION = 1;
 
 /**
  * PHASE 4: THE SHIELD (Persistence Layer)
- * Handles local-only IndexedDB storage for clinical encounters.
+ * Handles local-only IndexedDB storage for clinical encounters using Dexie.
  */
-export const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = (e) => {
-      const db = (e.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
+
+class RanvierVault extends Dexie {
+  encounters!: Table<MedicalEncounter>;
+
+  constructor() {
+    super('RanvierVault');
+    // v1: Define schema
+    // Cast 'this' to any to bypass TS error on version() method in strict mode
+    (this as any).version(1).stores({
+      encounters: 'id, timestamp, status' // Primary key 'id', indexes on timestamp and status
+    });
+  }
+}
+
+export const db = new RanvierVault();
 
 export const saveEncounter = async (encounter: MedicalEncounter): Promise<void> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(encounter);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await db.encounters.put(encounter);
 };
 
 export const getAllEncounters = async (): Promise<MedicalEncounter[]> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  return await db.encounters.toArray();
 };
 
 export const deleteEncounter = async (id: string): Promise<void> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await db.encounters.delete(id);
 };
