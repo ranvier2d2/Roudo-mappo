@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
@@ -60,6 +61,12 @@ const LiveSessionModal: React.FC = () => {
   const startSession = async () => {
     try {
         setStatus('connecting');
+        
+        // Auto-start encounter if needed so transcript is captured in state
+        if (!useAppStore.getState().currentEncounter) {
+            startEncounter();
+        }
+
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         // 1. Audio Context Setup
@@ -304,23 +311,13 @@ const LiveSessionModal: React.FC = () => {
         {/* Action Sidebar (Medical Shortcuts) */}
         {status === 'connected' && (
             <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-4 animate-in slide-in-from-left-4 duration-500">
-                {!currentEncounter ? (
-                    <button 
-                        onClick={handleStartEncounter}
-                        className="flex flex-col items-center gap-2 p-4 bg-memphis-yellow border-2 border-black shadow-memphis-sm hover:translate-x-1 hover:-translate-y-1 hover:shadow-memphis transition-all group"
-                    >
-                        <Clipboard size={24} className="group-hover:scale-110 transition-transform" />
-                        <span className="text-[10px] font-black uppercase">Start Encounter</span>
-                    </button>
-                ) : (
-                    <button 
-                        onClick={handleGoToEncounter}
-                        className="flex flex-col items-center gap-2 p-4 bg-memphis-teal border-2 border-black shadow-memphis-sm hover:translate-x-1 hover:-translate-y-1 hover:shadow-memphis transition-all group"
-                    >
-                        <FileText size={24} className="group-hover:scale-110 transition-transform" />
-                        <span className="text-[10px] font-black uppercase">View Current Note</span>
-                    </button>
-                )}
+                <button 
+                    onClick={handleGoToEncounter}
+                    className="flex flex-col items-center gap-2 p-4 bg-memphis-teal border-2 border-black shadow-memphis-sm hover:translate-x-1 hover:-translate-y-1 hover:shadow-memphis transition-all group"
+                >
+                    <FileText size={24} className="group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase">View Current Note</span>
+                </button>
             </div>
         )}
 

@@ -50,7 +50,13 @@ const TerminalInput: React.FC = () => {
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
-    addLog({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), type: LogType.USER_COMMAND, content: inputValue });
+    
+    // Clean log content for /scribe commands so transcript looks natural
+    const cleanContent = inputValue.startsWith('/scribe ') 
+        ? inputValue.replace('/scribe ', '') 
+        : inputValue;
+
+    addLog({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), type: LogType.USER_COMMAND, content: cleanContent });
     mutation.mutate({ command: inputValue });
   };
 

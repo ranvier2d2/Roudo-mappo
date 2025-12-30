@@ -1,3 +1,4 @@
+
 import { Type } from "@google/genai";
 import { SkillDef, SOAPData, CoreDataSuccessResponse } from '../../types';
 import { ai } from '../ai_engine';
@@ -45,14 +46,20 @@ export const autoScribeSOAP = async (transcript: string[]): Promise<SOAPData> =>
   if (!transcript || transcript.length === 0) {
     throw new Error("Transcript is empty. Nothing to scribe.");
   }
-  const combinedTranscript = transcript.join("\n");
+  
+  // Clean transcript of command prefixes if user manually typed them
+  const cleanedTranscript = transcript.map(line => line.replace(/^\/scribe\s*/i, ''));
+  const combinedTranscript = cleanedTranscript.join("\n");
+
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: `Analyze this clinical transcript. Structure it into SOAP and extract key medical concepts for coding validation.
+    If information for a specific section (like Objective) is missing in the transcript, enter "Not reported" or infer from context if appropriate.
+    
     TRANSCRIPT:
     ${combinedTranscript}`,
     config: {
-      systemInstruction: "You are a professional scribe. Extract clinical concepts only. Do not hallucinate codes.",
+      systemInstruction: "You are a professional medical scribe. Your output must be a valid JSON object matching the schema. Extract clinical entities (diseases, symptoms, procedures) into 'extractedConcepts' for downstream ICD-10 matching.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -70,13 +77,23 @@ export const autoScribeSOAP = async (transcript: string[]): Promise<SOAPData> =>
 
   try {
     const rawResult = JSON.parse(response.text || "{}");
-    const { coding, accuracy } = resolveConcepts(rawResult.extractedConcepts || []);
+    // Validate if fields exist, otherwise fallback
+    const validatedResult = {
+        subjective: rawResult.subjective || "Not reported",
+        objective: rawResult.objective || "Not reported",
+        assessment: rawResult.assessment || "Not reported",
+        plan: rawResult.plan || "Not reported",
+        extractedConcepts: rawResult.extractedConcepts || []
+    };
+
+    const { coding, accuracy } = resolveConcepts(validatedResult.extractedConcepts);
     
     LAST_SESSION_ACCURACY = accuracy;
     
-    return { ...rawResult, coding };
-  } catch (e) {
-    throw new Error("Neural structuring failed.");
+    return { ...validatedResult, coding };
+  } catch (e: any) {
+    console.error("Scribe Error:", e);
+    throw new Error("Neural structuring failed: " + e.message);
   }
 };
 
@@ -101,7 +118,7 @@ PLAN: ${soap.plan}
             skill: {
                 skillName: 'AI Medical Scribe',
                 status: 'completed',
-                message: 'SOAP Note Generated from text input.',
+                message: 'SOAP Note Generated. (Note: Use "Encounter" view for Billing/Coding)',
                 code: JSON.stringify(soap, null, 2)
             }
         };
